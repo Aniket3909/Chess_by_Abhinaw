@@ -1,0 +1,99 @@
+// === server/index.js === const express = require('express'); const http = require('http'); const socketio = require('socket.io'); const path = require('path');
+
+const app = express(); const server = http.createServer(app); const io = socketio(server);
+
+app.use(express.static(path.join(__dirname, '../client')));
+
+io.on('connection', socket => { console.log('A user connected');
+
+socket.on('join', room => { socket.join(room); const roomSize = io.sockets.adapter.rooms.get(room)?.size || 0; if (roomSize === 2) { io.to(room).emit('ready'); } });
+
+socket.on('move', ({ room, move }) => { socket.to(room).emit('move', move); });
+
+socket.on('disconnect', () => { console.log('A user disconnected'); }); });
+
+const PORT = process.env.PORT || 3000; server.listen(PORT, () => console.log(Server running on port ${PORT}));
+
+// === package.json === /* { "name": "chess-multiplayer", "version": "1.0.0", "main": "server/index.js", "scripts": { "start": "node server/index.js" }, "dependencies": { "express": "^4.18.2", "socket.io": "^4.7.2" } } */
+
+// === client/index.html === /*
+
+<!DOCTYPE html><html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chess Multiplayer</title>
+  <link rel="stylesheet" href="https://unpkg.com/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css" />
+  <script src="https://unpkg.com/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.13.4/chess.min.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    body { font-family: sans-serif; text-align: center; background: #f2f2f2; }
+    #board { width: 400px; margin: 20px auto; }
+    #status, #levelTitle { font-size: 18px; margin-top: 10px; }
+    #controls { margin-top: 15px; }
+    button { padding: 10px 15px; font-size: 16px; }
+  </style>
+</head>
+<body>
+  <h1 id="levelTitle">Multiplayer Chess</h1>
+  <div>
+    <input id="roomInput" placeholder="Enter Room ID" />
+    <button onclick="joinRoom()">Join Room</button>
+  </div>
+  <div id="board"></div>
+  <p id="status"></p>  <script>
+    const socket = io();
+    const game = new Chess();
+    let board, room = '';
+
+    function joinRoom() {
+      room = document.getElementById('roomInput').value;
+      if (!room) return alert('Enter a room ID');
+      socket.emit('join', room);
+    }
+
+    socket.on('ready', () => {
+      board = Chessboard("board", {
+        draggable: true,
+        position: 'start',
+        onDragStart: onDragStart,
+        onDrop: onDrop,
+        onSnapEnd: () => board.position(game.fen())
+      });
+      updateStatus();
+    });
+
+    function onDragStart(source, piece) {
+      if (game.game_over()) return false;
+      if ((game.turn() === 'w' && piece.search(/^b/) !== -1) ||
+          (game.turn() === 'b' && piece.search(/^w/) !== -1)) return false;
+    }
+
+    function onDrop(source, target) {
+      const move = game.move({ from: source, to: target, promotion: 'q' });
+      if (!move) return 'snapback';
+      updateStatus();
+      socket.emit('move', { room, move });
+    }
+
+    socket.on('move', move => {
+      game.move(move);
+      board.position(game.fen());
+      updateStatus();
+    });
+
+    function updateStatus() {
+      let status = '';
+      const moveColor = game.turn() === 'w' ? 'White' : 'Black';
+      if (game.in_checkmate()) status = `Checkmate! ${moveColor} loses.`;
+      else if (game.in_draw()) status = "Draw!";
+      else {
+        status = `${moveColor} to move`;
+        if (game.in_check()) status += ` - ${moveColor} is in check!`;
+      }
+      document.getElementById("status").innerText = status;
+    }
+  </script></body>
+</html>
+*/
