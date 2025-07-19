@@ -1,6 +1,0 @@
-chess-multiplayer/
-├── client/
-│   └── index.html         ← Your AI + levels frontend (already built)
-├── server/
-│   └── index.js           ← New server code using Socket.io
-├── package.json           ← Declares dependencies & start script
